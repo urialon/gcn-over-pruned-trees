@@ -8,6 +8,7 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 import numpy as np
 
+from model.self_attention import SelfAttention
 from model.tree import Tree, head_to_tree, tree_to_adj
 from utils import constant, torch_utils
 
@@ -43,7 +44,7 @@ class GCNRelationModel(nn.Module):
 
         # gcn layer
         self.gcn = GCN(opt, embeddings, opt['hidden_dim'], opt['num_layers'])
-
+        
         # output mlp layers
         in_dim = opt['hidden_dim']*3
         layers = [nn.Linear(in_dim, opt['hidden_dim']), nn.ReLU()]
@@ -123,6 +124,11 @@ class GCN(nn.Module):
         for layer in range(self.layers):
             input_dim = self.in_dim if layer == 0 else self.mem_dim
             self.W.append(nn.Linear(input_dim, self.mem_dim))
+            
+        # GA
+        if opt['ga_heads'] > 0:
+            self.selfatt = SelfAttention(num_heads=opt['ga_heads'], model_dim=opt['hidden_dim'],
+                                             dropout_keep_prob=1 - opt['gcn_dropout'])
 
     def conv_l2(self):
         conv_weights = []
@@ -170,7 +176,10 @@ class GCN(nn.Module):
 
             gAxW = F.relu(AxW)
             gcn_inputs = self.gcn_drop(gAxW) if l < self.layers - 1 else gAxW
-
+        
+        if self.opt['ga_heads'] > 0:
+            gcn_inputs = self.selfatt(gcn_inputs, 1 - mask.squeeze(2).float())
+        
         return gcn_inputs, mask
 
 def pool(h, mask, type='max'):
