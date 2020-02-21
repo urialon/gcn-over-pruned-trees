@@ -127,7 +127,12 @@ class GCN(nn.Module):
             
         # GA
         if opt['ga_heads'] > 0:
-            self.selfatt = SelfAttention(num_heads=opt['ga_heads'], model_dim=opt['hidden_dim'],
+            print('Using GA with {} heads, every layer: {}'.format(opt['ga_heads'], opt['ga_every_layer']))
+            if opt['ga_every_layer']:
+                self.selfatt = [SelfAttention(num_heads=opt['ga_heads'], model_dim=opt['hidden_dim'],
+                                             dropout_keep_prob=1 - opt['gcn_dropout']) for _ in range(opt['ga_heads'])]
+            else:
+                self.selfatt = SelfAttention(num_heads=opt['ga_heads'], model_dim=opt['hidden_dim'],
                                              dropout_keep_prob=1 - opt['gcn_dropout'])
 
     def conv_l2(self):
@@ -176,8 +181,10 @@ class GCN(nn.Module):
 
             gAxW = F.relu(AxW)
             gcn_inputs = self.gcn_drop(gAxW) if l < self.layers - 1 else gAxW
+            if self.opt['ga_heads'] > 0 and self.opt['ga_every_layer'] == True:
+                gcn_inputs = self.selfatt[l](gcn_inputs, 1 - mask.squeeze(2).float())
         
-        if self.opt['ga_heads'] > 0:
+        if self.opt['ga_heads'] > 0 and self.opt['ga_every_layer'] == False:
             gcn_inputs = self.selfatt(gcn_inputs, 1 - mask.squeeze(2).float())
         
         return gcn_inputs, mask
