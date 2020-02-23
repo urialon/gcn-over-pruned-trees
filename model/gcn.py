@@ -130,10 +130,10 @@ class GCN(nn.Module):
             print('Using GA with {} heads, every layer: {}'.format(opt['ga_heads'], opt['ga_every_layer']))
             if opt['ga_every_layer']:
                 self.selfatt = [SelfAttention(num_heads=opt['ga_heads'], model_dim=opt['hidden_dim'],
-                                             dropout_keep_prob=1 - opt['gcn_dropout']) for _ in range(num_layers)]
+                                             dropout_keep_prob=1 - opt['gcn_dropout'], use_cuda=self.use_cuda) for _ in range(num_layers)]
             else:
                 self.selfatt = SelfAttention(num_heads=opt['ga_heads'], model_dim=opt['hidden_dim'],
-                                             dropout_keep_prob=1 - opt['gcn_dropout'])
+                                             dropout_keep_prob=1 - opt['gcn_dropout'], use_cuda=self.use_cuda)
 
     def conv_l2(self):
         conv_weights = []

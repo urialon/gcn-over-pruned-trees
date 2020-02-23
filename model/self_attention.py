@@ -4,7 +4,8 @@ class SelfAttention(torch.nn.Module):
     def __init__(self,
                  num_heads,
                  model_dim,
-                 dropout_keep_prob):
+                 dropout_keep_prob,
+                 use_cuda):
         super(SelfAttention, self).__init__()
         
         self.num_heads = num_heads
@@ -13,6 +14,10 @@ class SelfAttention(torch.nn.Module):
         self.q_layer = torch.nn.Linear(model_dim, model_dim * self.num_heads, bias=False)
         self.out_layer = torch.nn.Linear(model_dim * self.num_heads, model_dim, bias=False)
         self.out_layer2 = torch.nn.Linear(model_dim * 2, model_dim, bias=False)
+        if use_cuda:
+            self.q_layer = self.q_layer.cuda()
+            self.out_layer = self.out_layer.cuda()
+            self.out_layer2 = self.out_layer2.cuda()
         self.relu = torch.nn.ReLU()
         self.softmax = torch.nn.Softmax(dim=-1)
         self.dropout = torch.nn.Dropout(1- dropout_keep_prob)
