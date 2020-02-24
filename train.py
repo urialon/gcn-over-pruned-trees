@@ -52,6 +52,7 @@ parser.add_argument('--rnn_dropout', type=float, default=0.5, help='RNN dropout 
 
 parser.add_argument('--lr', type=float, default=1.0, help='Applies to sgd and adagrad.')
 parser.add_argument('--lr_decay', type=float, default=0.9, help='Learning rate decay rate.')
+parser.add_argument('--min_lr', type=float, default=0.0, help='Minimal learning rate.')
 parser.add_argument('--decay_epoch', type=int, default=5, help='Decay learning rate after this epoch.')
 parser.add_argument('--optim', choices=['sgd', 'adagrad', 'adam', 'adamax'], default='sgd', help='Optimizer: sgd, adagrad, adam or adamax.')
 parser.add_argument('--num_epoch', type=int, default=100, help='Number of total training epochs.')
@@ -179,8 +180,8 @@ for epoch in range(1, opt['num_epoch']+1):
 
     # lr schedule
     if len(dev_score_history) > opt['decay_epoch'] and dev_score <= dev_score_history[-1] and \
-            opt['optim'] in ['sgd', 'adagrad', 'adadelta']:
-        current_lr *= opt['lr_decay']
+            current_lr > opt['min_lr'] and opt['optim'] in ['sgd', 'adagrad', 'adadelta']:
+        current_lr = max(current_lr * opt['lr_decay'], opt['min_lr'])
         trainer.update_lr(current_lr)
 
     dev_score_history += [dev_score]
