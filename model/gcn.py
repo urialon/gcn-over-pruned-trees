@@ -83,7 +83,8 @@ class GCNRelationModel(nn.Module):
             return Variable(adj.cuda()) if self.opt['cuda'] else Variable(adj)
 
         adj = inputs_to_tree_reps(head.data, words.data, l, self.opt['prune_k'], subj_pos.data, obj_pos.data)
-        h, pool_mask = self.gcn(adj, inputs)
+        adjall = inputs_to_tree_reps(head.data, words.data, l, -1, subj_pos.data, obj_pos.data)
+        h, pool_mask = self.gcn(adj, adjall, inputs)
         
         # pooling
         subj_mask, obj_mask = subj_pos.eq(0).eq(0).unsqueeze(2), obj_pos.eq(0).eq(0).unsqueeze(2) # invert mask
@@ -149,7 +150,7 @@ class GCN(nn.Module):
         rnn_outputs, _ = nn.utils.rnn.pad_packed_sequence(rnn_outputs, batch_first=True)
         return rnn_outputs
 
-    def forward(self, adj, inputs):
+    def forward(self, adj, adjall, inputs):
         words, masks, pos, ner, deprel, head, subj_pos, obj_pos, subj_type, obj_type = inputs # unpack
         word_embs = self.emb(words)
         embs = [word_embs]
@@ -169,6 +170,7 @@ class GCN(nn.Module):
         # gcn layer
         denom = adj.sum(2).unsqueeze(2) + 1
         mask = (adj.sum(2) + adj.sum(1)).eq(0).unsqueeze(2)
+        maskall = (adjall.sum(2) + adjall.sum(1)).eq(0).unsqueeze(2)
         # zero out adj for ablation
         if self.opt.get('no_adj', False):
             adj = torch.zeros_like(adj)
@@ -182,10 +184,11 @@ class GCN(nn.Module):
             gAxW = F.relu(AxW)
             gcn_inputs = self.gcn_drop(gAxW) if l < self.layers - 1 else gAxW
             if self.opt['ga_heads'] > 0 and self.opt['ga_every_layer'] == True:
-                gcn_inputs = self.selfatt[l](gcn_inputs, 1 - mask.squeeze(2).float())
+                gcn_inputs = self.selfatt[l](gcn_inputs, 1 - maskall.squeeze(2).float())
         
         if self.opt['ga_heads'] > 0 and self.opt['ga_every_layer'] == False:
-            gcn_inputs = self.selfatt(gcn_inputs, 1 - mask.squeeze(2).float())
+            gcn_inputs = self.selfatt(gcn_inputs, 1 - maskall.squeeze(2).float())
+            #gcn_inputs /= torch.sum((1-mask).float(), dim=1, keepdim=True)
         
         return gcn_inputs, mask
 
