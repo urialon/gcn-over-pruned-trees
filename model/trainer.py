@@ -64,7 +64,10 @@ class GCNTrainer(Trainer):
         self.opt = opt
         self.emb_matrix = emb_matrix
         self.model = GCNClassifier(opt, emb_matrix=emb_matrix)
-        self.criterion = nn.CrossEntropyLoss()
+        if opt['label_weight'] > 1:
+            self.criterion = nn.CrossEntropyLoss(weight=torch.cat([torch.ones(1), opt['label_weight']*torch.ones(opt['num_class'] - 1)], dim=-1))
+        else:
+            self.criterion = nn.CrossEntropyLoss()
         self.parameters = [p for p in self.model.parameters() if p.requires_grad]
         if opt['cuda']:
             self.model.cuda()
@@ -78,6 +81,7 @@ class GCNTrainer(Trainer):
         self.model.train()
         self.optimizer.zero_grad()
         logits, pooling_output = self.model(inputs)
+        
         loss = self.criterion(logits, labels)
         # l2 decay on all conv layers
         if self.opt.get('conv_l2', 0) > 0:
