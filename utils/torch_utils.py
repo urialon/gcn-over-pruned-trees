@@ -92,7 +92,7 @@ class MyAdagrad(Optimizer):
 ### torch specific functions
 def get_optimizer(name, parameters, lr, l2=0):
     if name == 'sgd':
-        return torch.optim.SGD(parameters, lr=lr, weight_decay=l2)
+        return torch.optim.SGD(parameters, lr=lr, weight_decay=l2) #, momentum=0.9, nesterov=True) 
     elif name in ['adagrad', 'myadagrad']:
         # use my own adagrad to allow for init accumulator value
         return MyAdagrad(parameters, lr=lr, init_accu_value=0.1, weight_decay=l2)
