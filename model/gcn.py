@@ -77,7 +77,7 @@ class GCNRelationModel(nn.Module):
         def inputs_to_tree_reps(head, words, l, prune, subj_pos, obj_pos):
             head, words, subj_pos, obj_pos = head.cpu().numpy(), words.cpu().numpy(), subj_pos.cpu().numpy(), obj_pos.cpu().numpy()
             trees = [head_to_tree(head[i], words[i], l[i], prune, subj_pos[i], obj_pos[i]) for i in range(len(l))]
-            adj = [tree_to_adj(maxlen, tree, directed=False, self_loop=False).reshape(1, maxlen, maxlen) for tree in trees]
+            adj = [tree_to_adj(maxlen, tree, directed=True, self_loop=False).reshape(1, maxlen, maxlen) for tree in trees]
             adj = np.concatenate(adj, axis=0)
             adj = torch.from_numpy(adj)
             return Variable(adj.cuda()) if self.opt['cuda'] else Variable(adj)
@@ -121,10 +121,12 @@ class GCN(nn.Module):
 
         # gcn layer
         self.W = nn.ModuleList()
+        self.W_back = nn.ModuleList()
 
         for layer in range(self.layers):
             input_dim = self.in_dim if layer == 0 else self.mem_dim
             self.W.append(nn.Linear(input_dim, self.mem_dim))
+            self.W_back.append(nn.Linear(input_dim, self.mem_dim))
             
         # GA
         if opt['ga_heads'] > 0:
@@ -169,6 +171,8 @@ class GCN(nn.Module):
         
         # gcn layer
         denom = adj.sum(2).unsqueeze(2) + 1
+        adj_transpose = torch.transpose(adj, 1, 2)
+        denom_back = adj_transpose.sum(2).unsqueeze(2) + 1
         mask = (adj.sum(2) + adj.sum(1)).eq(0).unsqueeze(2)
         maskall = (adjall.sum(2) + adjall.sum(1)).eq(0).unsqueeze(2)
         # zero out adj for ablation
@@ -177,9 +181,15 @@ class GCN(nn.Module):
 
         for l in range(self.layers):
             Ax = adj.bmm(gcn_inputs)
+            Ax_back = adj_transpose.bmm(gcn_inputs)
             AxW = self.W[l](Ax)
+            AxW_back = self.W_back[l](Ax_back)
             AxW = AxW + self.W[l](gcn_inputs) # self loop
+            AxW_back = AxW_back + self.W_back[l](gcn_inputs) # self loop
             AxW = AxW / denom
+            AxW_back = AxW_back / denom_back
+            
+            AxW += AxW_back
 
             gAxW = F.relu(AxW)
             gcn_inputs = self.gcn_drop(gAxW) if l < self.layers - 1 else gAxW
