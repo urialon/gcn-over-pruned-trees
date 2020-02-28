@@ -29,7 +29,7 @@ class SelfAttention(torch.nn.Module):
         outputs = self._scaled_dot_product(qs, tiled_inputs, tiled_inputs, attn_mask)  # (batch, num_heads, max_contexts, value_dim)
         outputs = self._concat_heads(outputs)  # (batch, max_contexts, value_dim * num_heads)
         outputs = self.out_layer(outputs)  # (batch, max_contexts, model_dim)
-        #outputs = self.relu(outputs)  # (batch, max_contexts, model_dim)
+        outputs = self.relu(outputs)  # (batch, max_contexts, model_dim)
 
         outputs = torch.cat([outputs, batched_inputs], dim=-1) # (batch, max_contexts, 2 * model_dim)
         #outputs = self.dropout(outputs)
@@ -62,7 +62,9 @@ class SelfAttention(torch.nn.Module):
 
         if valid_mask is not None:
             mask = torch.log(valid_mask.view(valid_mask.size()[0], 1, 1, valid_mask.size()[1])) # (batch, 1, 1, max_contexts)
+            self_mask = torch.log(1-torch.eye(mask.size(3)))
             scaled_scores += mask
+            scaled_scores += self_mask
 
         attention_weights = self.softmax(scaled_scores)  # (batch, num_heads, max_contexts, max_contexts)
         return torch.matmul(attention_weights, tiled_inputs)  # (batch, num_heads, max_contexts, value_dim)
